@@ -1,0 +1,18 @@
+{
+  "appId": "com.chra4.camera",
+  "appName": "Kamera",
+  "webDir": "www",
+  "server": {
+    "url": "https://camera.4chra.com/?app=ios",
+    "errorPath": "offline.html"
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0a1124"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "presentationOptions": ["banner", "sound", "list"]
+    }
+  }
+}
