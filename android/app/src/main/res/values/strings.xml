@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">کامێرا</string>
+    <string name="title_activity_main">کامێرا</string>
+    <string name="package_name">com.chra4.camera</string>
+    <string name="custom_url_scheme">com.chra4.camera</string>
+    <!-- background-geolocation plugin: persistent notification while driving -->
+    <string name="capacitor_background_geolocation_notification_channel_name">چاودێری GPS</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_camera</string>
+    <string name="capacitor_background_geolocation_notification_color">#16a34a</string>
+</resources>

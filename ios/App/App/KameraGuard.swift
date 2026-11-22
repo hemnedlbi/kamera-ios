@@ -366,6 +366,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
           if (p === 'BackgroundGeolocation' && m === 'addWatcher') post(state('start'));
           return nc.apply(C, arguments);
         };
+        var kc = window.__kc; if (kc && kc.S && kc.S.running && !kc.S.sim) post(state('start'));
         return true;
       }
       if (!hook()) { var n = 0, t = setInterval(function () { if (hook() || ++n > 200) clearInterval(t); }, 50); }
