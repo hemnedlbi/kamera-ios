@@ -1,0 +1,380 @@
+/*
+ کامێرا — ئاگادارکردنەوەی ناوخۆیی (native)
+ Design & Development Hemn A.Muhammad
+
+ The web page (camera.4chra.com) draws the map and plays beeps while it is on screen.
+ Everything that must keep working in the background — reading GPS, checking the
+ distance to each camera, sending the notification and playing the alert sound —
+ runs here in Swift, so it no longer depends on iOS keeping the WebView's JavaScript awake.
+
+ The page is not changed: a small script injected into it reports Start / Stop and
+ the settings to this class, and stops the page from sending its own notifications
+ (this class sends them instead, so they never arrive twice).
+*/
+
+import UIKit
+import WebKit
+import Capacitor
+import CoreLocation
+import UserNotifications
+import AVFoundation
+
+// MARK: - Bridge view controller that wires the page to KameraGuard
+
+class KameraBridgeViewController: CAPBridgeViewController {
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        guard let ucc = webView?.configuration.userContentController else { return }
+        ucc.add(KameraMessageProxy(), name: "kameraGuard")
+        ucc.addUserScript(WKUserScript(source: KameraGuard.hookJS, injectionTime: .atDocumentEnd, forMainFrameOnly: true))
+    }
+}
+
+/// Separate object so the WKUserContentController does not retain the view controller.
+final class KameraMessageProxy: NSObject, WKScriptMessageHandler {
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard let body = message.body as? [String: Any], let cmd = body["cmd"] as? String else { return }
+        DispatchQueue.main.async {
+            switch cmd {
+            case "start": KameraGuard.shared.start(body)
+            case "stop": KameraGuard.shared.stop()
+            case "settings": KameraGuard.shared.apply(body)
+            default: break
+            }
+        }
+    }
+}
+
+// MARK: - Native camera alerts
+
+final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDelegate {
+    static let shared = KameraGuard()
+    private static let site = "https://camera.4chra.com"
+    private static let armKmh = 40.0
+
+    struct Cam { let id: String; let lat: Double; let lon: Double; let speed: Int? }
+    final class Rec { var stage = 0; var passed = false; var urgentSent = false }
+    final class Zone {
+        let limit: Int; let t0: Date; var dist = 0.0; var last: (Double, Double); var warnedAt = Date.distantPast
+        init(limit: Int, t0: Date, last: (Double, Double)) { self.limit = limit; self.t0 = t0; self.last = last }
+    }
+
+    private let lm = CLLocationManager()
+    private var running = false
+    private var armed = false
+    private var cams: [Cam] = []        // official list + approved community cameras
+    private var userCams: [Cam] = []    // cameras the user added on this phone
+    private var alertDist = 500.0
+    private var margin = 5.0
+    private var soundOn = true
+
+    // per-drive state
+    private var prev: (lat: Double, lon: Double, t: Date)?
+    private var heading: Double?
+    private var kmh = 0.0
+    private var alerted: [String: Rec] = [:]
+    private var zone: Zone?
+    private var lastPassed: Cam?
+    private var lastUrgentSound = Date.distantPast
+    private var player: AVAudioPlayer?
+
+    private override init() {
+        super.init()
+        lm.delegate = self
+        lm.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        lm.distanceFilter = 5
+        lm.activityType = .automotiveNavigation
+        lm.pausesLocationUpdatesAutomatically = false
+        lm.allowsBackgroundLocationUpdates = true
+        lm.showsBackgroundLocationIndicator = true
+        cams = Self.parseCams(try? Data(contentsOf: Self.cacheURL("cams_official.json")))
+             + Self.parseCams(try? Data(contentsOf: Self.cacheURL("cams_community.json")))
+        installNotificationSounds()
+    }
+
+    // MARK: commands from the page
+
+    func start(_ msg: [String: Any]) {
+        apply(msg)
+        resetDrive()
+        armed = (msg["armed"] as? Bool) ?? false
+        running = true
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        refreshCams()
+        startLocationIfAllowed()
+    }
+
+    func stop() {
+        running = false
+        lm.stopUpdatingLocation()
+        resetDrive()
+    }
+
+    func apply(_ msg: [String: Any]) {
+        if let s = msg["settings"] as? [String: Any] {
+            if let v = (s["alertDist"] as? NSNumber)?.doubleValue, v > 0 { alertDist = v }
+            if let v = (s["margin"] as? NSNumber)?.doubleValue, v >= 0 { margin = v }
+            if let v = s["sound"] as? Bool { soundOn = v }
+        }
+        if let u = msg["userCams"] as? [[String: Any]] { userCams = Self.parseCamList(u) }
+    }
+
+    private func resetDrive() {
+        prev = nil; heading = nil; kmh = 0; alerted.removeAll(); zone = nil; lastPassed = nil
+    }
+
+    private func startLocationIfAllowed() {
+        guard running else { return }
+        let st = lm.authorizationStatus
+        if st == .authorizedAlways || st == .authorizedWhenInUse { lm.startUpdatingLocation() }
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) { startLocationIfAllowed() }
+
+    // MARK: camera list (downloaded and cached so it also works with weak signal)
+
+    private static func cacheURL(_ name: String) -> URL {
+        FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appendingPathComponent(name)
+    }
+
+    private func refreshCams() {
+        let group = DispatchGroup()
+        var official: Data?, community: Data?
+        for (path, file) in [("/cameras.json", "cams_official.json"), ("/api/cameras", "cams_community.json")] {
+            guard let url = URL(string: Self.site + path) else { continue }
+            group.enter()
+            var req = URLRequest(url: url); req.cachePolicy = .reloadIgnoringLocalCacheData; req.timeoutInterval = 15
+            URLSession.shared.dataTask(with: req) { data, resp, _ in
+                DispatchQueue.main.async {
+                    if let data = data, (resp as? HTTPURLResponse)?.statusCode == 200,
+                       path != "/cameras.json" || !Self.parseCams(data).isEmpty {
+                        try? data.write(to: Self.cacheURL(file), options: .atomic)
+                        if path == "/cameras.json" { official = data } else { community = data }
+                    }
+                    group.leave()
+                }
+            }.resume()
+        }
+        group.notify(queue: .main) { [weak self] in
+            guard let self = self, official != nil || community != nil else { return }
+            self.cams = Self.parseCams(official ?? (try? Data(contentsOf: Self.cacheURL("cams_official.json"))))
+                      + Self.parseCams(community ?? (try? Data(contentsOf: Self.cacheURL("cams_community.json"))))
+        }
+    }
+
+    private static func parseCams(_ data: Data?) -> [Cam] {
+        guard let data = data, let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let list = obj["cameras"] as? [[String: Any]] else { return [] }
+        return parseCamList(list)
+    }
+
+    private static func parseCamList(_ list: [[String: Any]]) -> [Cam] {
+        list.compactMap { c in
+            guard let lat = (c["lat"] as? NSNumber)?.doubleValue, let lon = (c["lon"] as? NSNumber)?.doubleValue else { return nil }
+            let id = (c["id"] as? String) ?? (c["id"] as? NSNumber)?.stringValue ?? "\(lat),\(lon)"
+            let sp = (c["speed"] as? NSNumber)?.intValue
+            return Cam(id: id, lat: lat, lon: lon, speed: (sp ?? 0) > 0 ? sp : nil)
+        }
+    }
+
+    private var allCams: [Cam] { cams + userCams }
+
+    // MARK: geo helpers (same formulas as the web page)
+
+    private static let rad = Double.pi / 180
+    private static func dist(_ a: Double, _ b: Double, _ c: Double, _ d: Double) -> Double {
+        let dLat = (c - a) * rad, dLon = (d - b) * rad
+        let x = pow(sin(dLat / 2), 2) + cos(a * rad) * cos(c * rad) * pow(sin(dLon / 2), 2)
+        return 2 * 6371000 * asin(min(1, sqrt(x)))
+    }
+    private static func bearing(_ a: Double, _ b: Double, _ c: Double, _ d: Double) -> Double {
+        let y = sin((d - b) * rad) * cos(c * rad)
+        let x = cos(a * rad) * sin(c * rad) - sin(a * rad) * cos(c * rad) * cos((d - b) * rad)
+        return (atan2(y, x) / rad + 360).truncatingRemainder(dividingBy: 360)
+    }
+    private static func angDiff(_ a: Double, _ b: Double) -> Double {
+        let d = abs(a - b).truncatingRemainder(dividingBy: 360); return d > 180 ? 360 - d : d
+    }
+    private static func fmtDist(_ d: Double) -> String {
+        d >= 1000 ? String(format: "%.1f کم", d / 1000) : "\(max(0, Int((d / 10).rounded()) * 10)) م"
+    }
+
+    // MARK: position handling
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard running else { return }
+        for loc in locations where loc.horizontalAccuracy >= 0 && loc.horizontalAccuracy < 100 { onPosition(loc) }
+    }
+
+    private func onPosition(_ loc: CLLocation) {
+        let lat = loc.coordinate.latitude, lon = loc.coordinate.longitude, ts = loc.timestamp, acc = loc.horizontalAccuracy
+        var k: Double? = loc.speed >= 0 ? loc.speed * 3.6 : nil
+        if let p = prev {
+            let d = Self.dist(p.lat, p.lon, lat, lon), dt = ts.timeIntervalSince(p.t)
+            if k == nil && dt > 0.5 { k = d / dt * 3.6 }
+            if d >= 12 && acc < 60 { heading = Self.bearing(p.lat, p.lon, lat, lon); prev = (lat, lon, ts) }
+        } else { prev = (lat, lon, ts) }
+        if loc.course >= 0, let kk = k, kk > 8 { heading = loc.course }
+        if let kk = k { kmh = kmh * 0.3 + kk * 0.7 }
+        if kmh < 1 { kmh = 0 }
+        if !armed && kmh >= Self.armKmh { armed = true }
+
+        if let z = zone {
+            let step = Self.dist(z.last.0, z.last.1, lat, lon)
+            if acc < 60 && step < 600 { z.dist += step }
+            z.last = (lat, lon)
+            if z.dist > 8000 || ts.timeIntervalSince(z.t0) > 15 * 60 { zone = nil }
+        }
+        processCams(lat, lon, ts)
+    }
+
+    private func markGroup(_ c: Cam, _ rec: Rec) {
+        // two cameras at the same spot (one per direction) alert only once
+        for o in allCams where Self.dist(c.lat, c.lon, o.lat, o.lon) < 60 { alerted[o.id] = rec }
+    }
+
+    private func processCams(_ lat: Double, _ lon: Double, _ ts: Date) {
+        var best: (c: Cam, d: Double)?
+        for c in allCams {
+            let d = Self.dist(lat, lon, c.lat, c.lon)
+            let rec = alerted[c.id]
+            if d > alertDist + 300 && rec != nil { alerted[c.id] = nil }
+            if d > 6000 { continue }
+            let ahead = heading == nil || d < 35 || Self.angDiff(Self.bearing(lat, lon, c.lat, c.lon), heading ?? 0) <= 50
+            if !ahead {
+                if let r = rec, !r.passed, d < 300 {
+                    r.passed = true
+                    if let sp = c.speed { lastPassed = c; if d < 150 { zone = Zone(limit: sp, t0: ts, last: (lat, lon)) } }
+                }
+                continue
+            }
+            if rec?.passed == true { continue }
+            if d <= alertDist && d < (best?.d ?? .infinity) { best = (c, d) }
+        }
+        checkZone(ts)
+
+        guard let hit = best, kmh >= 10, armed else { return }
+        let c = hit.c, d = hit.d
+        let rec: Rec
+        if let r = alerted[c.id] { rec = r } else { rec = Rec(); markGroup(c, rec) }
+        let over = c.speed.map { kmh > Double($0) + margin } ?? false
+        let limitText = c.speed.map { " — سنوور \($0) km/h" } ?? ""
+        if rec.stage < 1 {
+            rec.stage = 1
+            if over {
+                rec.urgentSent = true; lastUrgentSound = Date()
+                notify("⚠️ خێراییت کەم بکەرەوە!", "کامێرا \(Self.fmtDist(d)) لە پێشەوە\(limitText)", sound: "urgent")
+            } else {
+                notify("📷 کامێرا لە پێشەوەیە", Self.fmtDist(d) + limitText, sound: "warn")
+            }
+        } else if over {
+            if !rec.urgentSent {
+                rec.urgentSent = true; lastUrgentSound = Date()
+                notify("⚠️ خێراییت کەم بکەرەوە!", "کامێرا \(Self.fmtDist(d)) لە پێشەوە\(limitText)", sound: "urgent")
+            } else if Date().timeIntervalSince(lastUrgentSound) > 6 {
+                lastUrgentSound = Date(); _ = playSound("urgent")   // keep reminding while still too fast
+            }
+        }
+    }
+
+    private func checkZone(_ ts: Date) {
+        guard let z = zone else { return }
+        let secs = ts.timeIntervalSince(z.t0)
+        guard secs > 10, z.dist >= 100 else { return }
+        let avg = z.dist / secs * 3.6
+        if avg > Double(z.limit) + margin && Date().timeIntervalSince(z.warnedAt) > 20 {
+            z.warnedAt = Date()
+            notify("⚠️ تێکڕای خێراییت زیاترە", "تێکڕا \(Int(avg.rounded())) — سنوور \(z.limit) km/h", sound: "avg")
+        }
+    }
+
+    // MARK: alert output
+
+    private func notify(_ title: String, _ body: String, sound: String) {
+        let played = playSound(sound)
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        // if the app already played the sound itself, the banner stays silent (no double sound)
+        if !played && soundOn { content.sound = UNNotificationSound(named: UNNotificationSoundName(sound + ".wav")) }
+        if #available(iOS 15.0, *) { content.interruptionLevel = .timeSensitive }
+        let req = UNNotificationRequest(identifier: "kamera-" + UUID().uuidString, content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req, withCompletionHandler: nil)
+    }
+
+    /// Plays the alert through the speaker even when the silent switch is on, and lowers music meanwhile.
+    @discardableResult
+    private func playSound(_ name: String) -> Bool {
+        guard soundOn, let url = Bundle.main.url(forResource: name, withExtension: "wav", subdirectory: "public") else { return false }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .default, options: [.duckOthers])
+            try session.setActive(true)
+            let p = try AVAudioPlayer(contentsOf: url)
+            p.delegate = self
+            p.volume = 1
+            p.prepareToPlay()
+            guard p.play() else { return false }
+            player = p
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    /// Notification sounds must sit in Library/Sounds (or the bundle root) — copy them there once.
+    private func installNotificationSounds() {
+        let fm = FileManager.default
+        guard let lib = fm.urls(for: .libraryDirectory, in: .userDomainMask).first else { return }
+        let dir = lib.appendingPathComponent("Sounds")
+        try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        for n in ["warn", "urgent", "avg"] {
+            guard let src = Bundle.main.url(forResource: n, withExtension: "wav", subdirectory: "public") else { continue }
+            let dst = dir.appendingPathComponent(n + ".wav")
+            try? fm.removeItem(at: dst)
+            try? fm.copyItem(at: src, to: dst)
+        }
+    }
+
+    // MARK: script injected into camera.4chra.com
+
+    static let hookJS = """
+    (function () {
+      if (window.__kgInstalled) return; window.__kgInstalled = true;
+      function post(m) { try { window.webkit.messageHandlers.kameraGuard.postMessage(m); } catch (e) {} }
+      function read(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
+      function state(cmd) {
+        var kc = window.__kc;
+        return { cmd: cmd, settings: read('kc_settings', {}), userCams: read('kc_user_cams', []),
+                 armed: !!(kc && kc.S && kc.S.armed) };
+      }
+      function hook() {
+        var C = window.Capacitor;
+        if (!C || typeof C.nativePromise !== 'function' || typeof C.nativeCallback !== 'function') return false;
+        if (C.__kg) return true; C.__kg = true;
+        var np = C.nativePromise, nc = C.nativeCallback;
+        C.nativePromise = function (p, m) {
+          if (p === 'LocalNotifications' && m === 'schedule') return Promise.resolve({ notifications: [] });
+          if (p === 'BackgroundGeolocation' && m === 'removeWatcher') post({ cmd: 'stop' });
+          return np.apply(C, arguments);
+        };
+        C.nativeCallback = function (p, m) {
+          if (p === 'BackgroundGeolocation' && m === 'addWatcher') post(state('start'));
+          return nc.apply(C, arguments);
+        };
+        return true;
+      }
+      if (!hook()) { var n = 0, t = setInterval(function () { if (hook() || ++n > 200) clearInterval(t); }, 50); }
+      var si = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k) {
+        var r = si.apply(this, arguments);
+        if (k === 'kc_settings' || k === 'kc_user_cams') post(state('settings'));
+        return r;
+      };
+    })();
+    """
+}
