@@ -2,7 +2,7 @@ name: Build iOS app (AltStore / SideStore)
 
 on:
   push:
-    branches: [main]
+    branches: [main, native-alerts]
   workflow_dispatch:
 
 permissions:
@@ -58,7 +58,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest -y --cleanup-tag || true
-          gh release create latest Kamera.ipa \
-            --title "Kamera iOS — build ${{ github.run_number }}" \
+          # main → release "latest"; any other branch → test pre-release "test-<branch>"
+          if [ "$GITHUB_REF_NAME" = "main" ]; then TAG=latest; PRE=""; else TAG="test-$GITHUB_REF_NAME"; PRE="--prerelease"; fi
+          gh release delete "$TAG" -y --cleanup-tag || true
+          gh release create "$TAG" Kamera.ipa $PRE --target "$GITHUB_SHA" \
+            --title "Kamera iOS — build ${{ github.run_number }} ($GITHUB_REF_NAME)" \
             --notes "Unsigned IPA. Install with AltStore or SideStore. Design & Development Hemn A.Muhammad"
