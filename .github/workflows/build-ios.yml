@@ -2,7 +2,7 @@ name: Build iOS app (AltStore / SideStore)
 
 on:
   push:
-    branches: [main, native-alerts]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
