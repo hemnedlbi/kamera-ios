@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Traffic Cam Iraq</string>
-    <string name="title_activity_main">Traffic Cam Iraq</string>
+    <string name="app_name">TCK</string>
+    <string name="title_activity_main">TCK – Traffic Camera Kurdistan</string>
     <string name="package_name">com.chra4.camera</string>
     <string name="custom_url_scheme">com.chra4.camera</string>
     <!-- background-geolocation plugin: ongoing "alerts are on" notification -->
