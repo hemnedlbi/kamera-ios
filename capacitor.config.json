@@ -12,7 +12,15 @@
   },
   "plugins": {
     "LocalNotifications": {
-      "presentationOptions": ["banner", "sound", "list"]
+      "presentationOptions": [
+        "banner",
+        "sound",
+        "list"
+      ]
     }
+  },
+  "android": {
+    "backgroundColor": "#0a1124",
+    "useLegacyBridge": true
   }
 }

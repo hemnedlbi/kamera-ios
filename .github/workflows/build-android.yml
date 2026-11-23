@@ -1,0 +1,74 @@
+name: Build Android app (APK for testing + AAB for Google Play)
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    env:
+      VERSION_CODE: ${{ github.run_number }}
+      VERSION_NAME: 1.0.${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install packages
+        run: npm ci || npm install
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build test APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk ../Kamera.apk
+
+      # Signed bundle for Google Play — only when the upload key is set in the repo secrets
+      - name: Build signed AAB (Google Play)
+        env:
+          KEYSTORE_B64: ${{ secrets.KAMERA_KEYSTORE_B64 }}
+          KAMERA_KEYSTORE_PASSWORD: ${{ secrets.KAMERA_KEYSTORE_PASSWORD }}
+          KAMERA_KEY_ALIAS: ${{ secrets.KAMERA_KEY_ALIAS }}
+          KAMERA_KEY_PASSWORD: ${{ secrets.KAMERA_KEY_PASSWORD }}
+        if: env.KEYSTORE_B64 != ''
+        working-directory: android
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+          export KAMERA_KEYSTORE_FILE="$RUNNER_TEMP/upload.jks"
+          ./gradlew bundleRelease --no-daemon --stacktrace
+          cp app/build/outputs/bundle/release/app-release.aab ../Kamera.aab
+          rm -f "$RUNNER_TEMP/upload.jks"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Kamera-android
+          path: |
+            Kamera.apk
+            Kamera.aab
+          if-no-files-found: ignore
+
+      - name: Publish test APK as a release (easy download on the phone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # main -> "android-latest"; any other branch -> pre-release "android-test-<branch>"
+          if [ "$GITHUB_REF_NAME" = "main" ]; then TAG=android-latest; PRE=""; else TAG="android-test-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"; PRE="--prerelease"; fi
+          gh release delete "$TAG" -y --cleanup-tag || true
+          gh release create "$TAG" Kamera.apk $PRE --target "$GITHUB_SHA" \
+            --title "کامێرا Android — build ${{ github.run_number }} ($GITHUB_REF_NAME)" \
+            --notes "Test APK for Android (install directly on the phone). Design & Development Hemn A.Muhammad"
