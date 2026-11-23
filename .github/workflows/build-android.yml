@@ -70,5 +70,5 @@ jobs:
           if [ "$GITHUB_REF_NAME" = "main" ]; then TAG=android-latest; PRE=""; else TAG="android-test-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"; PRE="--prerelease"; fi
           gh release delete "$TAG" -y --cleanup-tag || true
           gh release create "$TAG" Kamera.apk $PRE --target "$GITHUB_SHA" \
-            --title "کامێرا Android — build ${{ github.run_number }} ($GITHUB_REF_NAME)" \
+            --title "Traffic Cam Iraq Android — build ${{ github.run_number }} ($GITHUB_REF_NAME)" \
             --notes "Test APK for Android (install directly on the phone). Design & Development Hemn A.Muhammad"

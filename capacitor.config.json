@@ -1,6 +1,6 @@
 {
   "appId": "com.chra4.camera",
-  "appName": "Kamera",
+  "appName": "Traffic Cam Iraq",
   "webDir": "www",
   "server": {
     "url": "https://camera.4chra.com/?app=ios",
