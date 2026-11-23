@@ -54,12 +54,23 @@ jobs:
           cp app/build/outputs/bundle/release/app-release.aab ../Kamera.aab
           rm -f "$RUNNER_TEMP/upload.jks"
 
+      # Without the key secrets: unsigned AAB (signed afterwards with the upload key, outside CI)
+      - name: Build unsigned AAB
+        env:
+          KEYSTORE_B64: ${{ secrets.KAMERA_KEYSTORE_B64 }}
+        if: env.KEYSTORE_B64 == ''
+        working-directory: android
+        run: |
+          ./gradlew bundleRelease --no-daemon --stacktrace
+          cp app/build/outputs/bundle/release/app-release.aab ../Kamera-unsigned.aab
+
       - uses: actions/upload-artifact@v4
         with:
           name: Kamera-android
           path: |
             Kamera.apk
             Kamera.aab
+            Kamera-unsigned.aab
           if-no-files-found: ignore
 
       - name: Publish test APK as a release (easy download on the phone)
@@ -69,6 +80,7 @@ jobs:
           # main -> "android-latest"; any other branch -> pre-release "android-test-<branch>"
           if [ "$GITHUB_REF_NAME" = "main" ]; then TAG=android-latest; PRE=""; else TAG="android-test-$(echo "$GITHUB_REF_NAME" | tr '/' '-')"; PRE="--prerelease"; fi
           gh release delete "$TAG" -y --cleanup-tag || true
-          gh release create "$TAG" Kamera.apk $PRE --target "$GITHUB_SHA" \
+          FILES="Kamera.apk"; [ -f Kamera-unsigned.aab ] && FILES="$FILES Kamera-unsigned.aab"
+          gh release create "$TAG" $FILES $PRE --target "$GITHUB_SHA" \
             --title "TCK Android — build ${{ github.run_number }} ($GITHUB_REF_NAME)" \
             --notes "Test APK for Android (install directly on the phone). Design & Development Hemn A.Muhammad"
