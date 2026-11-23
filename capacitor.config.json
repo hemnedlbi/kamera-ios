@@ -1,6 +1,6 @@
 {
   "appId": "com.chra4.camera",
-  "appName": "Kamera",
+  "appName": "TCK",
   "webDir": "www",
   "server": {
     "url": "https://camera.4chra.com/?app=ios",
@@ -12,7 +12,15 @@
   },
   "plugins": {
     "LocalNotifications": {
-      "presentationOptions": ["banner", "sound", "list"]
+      "presentationOptions": [
+        "banner",
+        "sound",
+        "list"
+      ]
     }
+  },
+  "android": {
+    "backgroundColor": "#0a1124",
+    "useLegacyBridge": true
   }
 }

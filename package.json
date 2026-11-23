@@ -1,14 +1,17 @@
 {
   "name": "kamera-ios",
   "version": "1.0.0",
-  "description": "Kurdistan speed-camera alerts — iOS wrapper for camera.4chra.com. Design & Development Hemn A.Muhammad",
+  "description": "Kurdistan speed-camera alerts — iPhone and Android app for camera.4chra.com. Design & Development Hemn A.Muhammad",
   "scripts": {
-    "sync": "cap sync ios"
+    "sync": "cap sync",
+    "sync:ios": "cap sync ios",
+    "sync:android": "cap sync android"
   },
   "author": "Hemn A.Muhammad",
   "license": "UNLICENSED",
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.3.1",
+    "@capacitor/android": "^8.6.2",
     "@capacitor/cli": "^8.6.2",
     "@capacitor/core": "^8.6.2",
     "@capacitor/ios": "^8.6.2",

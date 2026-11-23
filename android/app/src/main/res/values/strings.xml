@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TCK</string>
+    <string name="title_activity_main">TCK – Traffic Camera Kurdistan</string>
+    <string name="package_name">com.chra4.camera</string>
+    <string name="custom_url_scheme">com.chra4.camera</string>
+    <!-- background-geolocation plugin: ongoing "alerts are on" notification -->
+    <string name="capacitor_background_geolocation_notification_channel_name">ئاگاداری کامێرا چالاکە</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_kamera</string>
+    <string name="capacitor_background_geolocation_notification_color">#16A34A</string>
+    <string name="kamera_channel_alerts">ئاگادارکردنەوەی کامێرا</string>
+</resources>
