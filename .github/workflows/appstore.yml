@@ -1,0 +1,143 @@
+name: Upload TCK to App Store Connect (TestFlight)
+
+# Run it by hand: GitHub → Actions → this workflow → "Run workflow".
+# Needs three repository secrets (Settings → Secrets and variables → Actions):
+#   ASC_KEY_ID     – Key ID of the App Store Connect API key (role: Admin)
+#   ASC_ISSUER_ID  – Issuer ID shown above the keys list
+#   ASC_KEY_P8     – the whole text of the downloaded AuthKey_XXXX.p8 file
+# Apple creates the distribution certificate and provisioning profile itself.
+# Design & Development Hemn A.Muhammad
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "App version shown on the App Store"
+        default: "1.0"
+        required: true
+      build:
+        description: "Build and upload a new app build"
+        type: boolean
+        default: true
+      screenshots:
+        description: "Make and upload App Store screenshots (from camera.4chra.com)"
+        type: boolean
+        default: true
+
+jobs:
+  appstore:
+    if: ${{ inputs.build }}
+    runs-on: macos-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets
+        run: |
+          test -n "$ASC_KEY_ID" || { echo "::error::Secret ASC_KEY_ID is missing"; exit 1; }
+          test -n "$ASC_ISSUER_ID" || { echo "::error::Secret ASC_ISSUER_ID is missing"; exit 1; }
+          test -n "${{ secrets.ASC_KEY_P8 }}" || { echo "::error::Secret ASC_KEY_P8 is missing"; exit 1; }
+
+      - name: Use newest stable Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|rc' | sort -V | tail -1)
+          echo "Using $XC"
+          sudo xcode-select -s "$XC"
+          xcodebuild -version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install packages
+        run: npm ci || npm install
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: API key file
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+
+      - name: Archive (signed automatically by Apple)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath build/TCK.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM=GG84JU45K5 CODE_SIGN_STYLE=Automatic \
+            CODE_SIGN_IDENTITY="Apple Development" \
+            MARKETING_VERSION=${{ inputs.version }} \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            archive | tail -60
+          test -d build/TCK.xcarchive
+
+      - name: Upload to App Store Connect
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/TCK.xcarchive \
+            -exportOptionsPlist appstore/ExportOptions.plist \
+            -exportPath build/export \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "Uploaded build ${{ inputs.version }} (${{ github.run_number }})."
+
+      - name: Remove key
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/keys"
+
+  screenshots:
+    if: ${{ inputs.screenshots }}
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Make screenshots (iPhone 6.9")
+        run: |
+          mkdir -p shots-tool && cd shots-tool && npm init -y >/dev/null && npm i playwright@1 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+          cp ../appstore/shots.mjs . && mkdir -p ../shots/en-US
+          node shots.mjs ../shots/en-US
+          ls -la ../shots/en-US
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TCK-screenshots
+          path: shots/en-US
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Upload screenshots
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          gem install fastlane --no-document >/dev/null
+          mkdir -p "$RUNNER_TEMP/keys"
+          python3 -c 'import json,os;json.dump({"key_id":os.environ["ASC_KEY_ID"],"issuer_id":os.environ["ASC_ISSUER_ID"],"key":os.environ["ASC_KEY_P8"],"in_house":False},open(os.environ["RUNNER_TEMP"]+"/keys/api_key.json","w"))'
+          mkdir -p fastlane && touch fastlane/Deliverfile
+          export FASTLANE_SKIP_UPDATE_CHECK=1 CI=true
+          fastlane deliver --api_key_path "$RUNNER_TEMP/keys/api_key.json" \
+            --app_identifier com.chra4.camera --app_version "${{ inputs.version }}" --platform ios \
+            --screenshots_path shots --overwrite_screenshots true \
+            --skip_binary_upload true --skip_metadata true --skip_app_version_update true \
+            --submit_for_review false --run_precheck_before_submit false --force true
+          rm -rf "$RUNNER_TEMP/keys"
