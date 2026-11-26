@@ -78,6 +78,14 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
     private var lastUrgentSound = Date.distantPast
     private var player: AVAudioPlayer?
 
+    // relaunch by iOS after the app was closed or the phone restarted
+    private static let kEnabled = "kg.enabled", kSettings = "kg.settings", kUserCams = "kg.userCams"
+    private static let idleSleep: TimeInterval = 10 * 60
+    private var resumedInBackground = false   // started by iOS, not by the page
+    private var sleeping = false              // GPS paused while parked; wakes on the next significant change
+    private var lastMoving = Date()
+    private var bgSession: AnyObject?         // CLBackgroundActivitySession on iOS 17+
+
     private override init() {
         super.init()
         lm.delegate = self
@@ -90,6 +98,8 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         cams = Self.parseCams(try? Data(contentsOf: Self.cacheURL("cams_official.json")))
              + Self.parseCams(try? Data(contentsOf: Self.cacheURL("cams_community.json")))
         installNotificationSounds()
+        NotificationCenter.default.addObserver(self, selector: #selector(appDidBecomeActive),
+                                               name: UIApplication.didBecomeActiveNotification, object: nil)
     }
 
     // MARK: commands from the page
@@ -99,14 +109,24 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         resetDrive()
         armed = (msg["armed"] as? Bool) ?? false
         running = true
+        resumedInBackground = false
+        sleeping = false
+        lastMoving = Date()
+        UserDefaults.standard.set(true, forKey: Self.kEnabled)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         refreshCams()
         startLocationIfAllowed()
+        startSignificantChanges()
     }
 
     func stop() {
         running = false
+        resumedInBackground = false
+        sleeping = false
+        UserDefaults.standard.set(false, forKey: Self.kEnabled)
         lm.stopUpdatingLocation()
+        lm.stopMonitoringSignificantLocationChanges()
+        endBackgroundSession()
         resetDrive()
     }
 
@@ -115,8 +135,55 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
             if let v = (s["alertDist"] as? NSNumber)?.doubleValue, v > 0 { alertDist = v }
             if let v = (s["margin"] as? NSNumber)?.doubleValue, v >= 0 { margin = v }
             if let v = s["sound"] as? Bool { soundOn = v }
+            if let d = try? JSONSerialization.data(withJSONObject: s) { UserDefaults.standard.set(d, forKey: Self.kSettings) }
         }
-        if let u = msg["userCams"] as? [[String: Any]] { userCams = Self.parseCamList(u) }
+        if let u = msg["userCams"] as? [[String: Any]] {
+            userCams = Self.parseCamList(u)
+            if let d = try? JSONSerialization.data(withJSONObject: u) { UserDefaults.standard.set(d, forKey: Self.kUserCams) }
+        }
+    }
+
+    /// Called by AppDelegate when iOS relaunches the app in the background for a location event
+    /// (after the app was swiped away or the phone restarted). Alerts carry on without the page.
+    func resumeIfEnabled() {
+        guard UserDefaults.standard.bool(forKey: Self.kEnabled), !running else { return }
+        var msg: [String: Any] = [:]
+        if let d = UserDefaults.standard.data(forKey: Self.kSettings),
+           let s = try? JSONSerialization.jsonObject(with: d) as? [String: Any] { msg["settings"] = s }
+        if let d = UserDefaults.standard.data(forKey: Self.kUserCams),
+           let u = try? JSONSerialization.jsonObject(with: d) as? [[String: Any]] { msg["userCams"] = u }
+        apply(msg)
+        resetDrive()
+        armed = false            // alerts arm at 40 km/h, as with auto-start in the page
+        running = true
+        resumedInBackground = true
+        sleeping = false
+        lastMoving = Date()
+        beginBackgroundSession()
+        refreshCams()
+        startLocationIfAllowed()
+        startSignificantChanges()
+    }
+
+    /// When the person opens the app after a background relaunch, the page takes over again
+    /// (its auto-start sends "start"), so the page and the alerts never disagree.
+    @objc private func appDidBecomeActive() {
+        guard resumedInBackground else { return }
+        stop()
+    }
+
+    private func startSignificantChanges() {
+        guard CLLocationManager.significantLocationChangeMonitoringAvailable() else { return }
+        lm.startMonitoringSignificantLocationChanges()
+    }
+
+    private func beginBackgroundSession() {
+        if #available(iOS 17.0, *), bgSession == nil { bgSession = CLBackgroundActivitySession() }
+    }
+
+    private func endBackgroundSession() {
+        if #available(iOS 17.0, *) { (bgSession as? CLBackgroundActivitySession)?.invalidate() }
+        bgSession = nil
     }
 
     private func resetDrive() {
@@ -203,7 +270,22 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard running else { return }
+        if sleeping {
+            // a significant change while parked: the car is moving again
+            sleeping = false
+            lastMoving = Date()
+            resetDrive()
+            startLocationIfAllowed()
+        }
         for loc in locations where loc.horizontalAccuracy >= 0 && loc.horizontalAccuracy < 100 { onPosition(loc) }
+        // after a background relaunch, pause precise GPS while parked to save battery
+        if resumedInBackground && !sleeping {
+            if kmh >= 10 { lastMoving = Date() }
+            else if Date().timeIntervalSince(lastMoving) > Self.idleSleep {
+                sleeping = true
+                lm.stopUpdatingLocation()
+            }
+        }
     }
 
     private func onPosition(_ loc: CLLocation) {

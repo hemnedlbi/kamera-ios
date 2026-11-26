@@ -7,7 +7,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // iOS relaunched the app in the background for a location event (the app had been
+        // swiped away or the phone restarted): keep the camera alerts going.
+        if launchOptions?[.location] != nil { KameraGuard.shared.resumeIfEnabled() }
         return true
     }
 
