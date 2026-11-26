@@ -18,7 +18,7 @@ private let green = Color(red: 0.086, green: 0.639, blue: 0.290)   // #16A34A
 private let red = Color(red: 0.863, green: 0.149, blue: 0.149)     // #DC2626
 private let amber = Color(red: 0.961, green: 0.620, blue: 0.043)   // #F59E0B
 
-private func tint(_ s: KameraActivityAttributes.ContentState) -> Color {
+private func stateColor(_ s: KameraActivityAttributes.ContentState) -> Color {
     if s.over { return red }
     if s.zoneLimit > 0 && s.zoneAvg > s.zoneLimit { return amber }
     return green
@@ -59,25 +59,25 @@ struct KameraLiveActivity: Widget {
                     if s.limit > 0 || s.zoneLimit > 0 {
                         LimitSign(limit: s.limit > 0 ? s.limit : s.zoneLimit).padding(.trailing, 4)
                     } else {
-                        Image(systemName: "camera.fill").foregroundColor(tint(s)).font(.title2).padding(.trailing, 4)
+                        Image(systemName: "camera.fill").foregroundColor(stateColor(s)).font(.title2).padding(.trailing, 4)
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(spacing: 2) {
-                        Text(headline(s)).font(.headline).foregroundColor(tint(s))
+                        Text(headline(s)).font(.headline).foregroundColor(stateColor(s))
                         Text(detail(s)).font(.subheadline).foregroundColor(.white.opacity(0.85))
                     }
                     .environment(\.layoutDirection, .rightToLeft)
                     .frame(maxWidth: .infinity)
                 }
             } compactLeading: {
-                Image(systemName: "camera.fill").foregroundColor(tint(s))
+                Image(systemName: "camera.fill").foregroundColor(stateColor(s))
             } compactTrailing: {
                 Text(s.dist >= 0 ? distText(s.dist) : "\(s.kmh)")
                     .font(.caption.weight(.semibold).monospacedDigit())
-                    .foregroundColor(tint(s))
+                    .foregroundColor(stateColor(s))
             } minimal: {
-                Image(systemName: "camera.fill").foregroundColor(tint(s))
+                Image(systemName: "camera.fill").foregroundColor(stateColor(s))
             }
         }
     }
@@ -88,7 +88,7 @@ private struct LockScreenView: View {
     var body: some View {
         HStack(spacing: 14) {
             VStack(alignment: .trailing, spacing: 4) {
-                Text(headline(s)).font(.headline).foregroundColor(tint(s))
+                Text(headline(s)).font(.headline).foregroundColor(stateColor(s))
                 Text(detail(s)).font(.subheadline).foregroundColor(.white.opacity(0.9))
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
@@ -109,7 +109,7 @@ private struct SpeedBadge: View {
             Text("km/h").font(.system(size: 9, weight: .medium)).foregroundColor(.white.opacity(0.7))
         }
         .frame(width: 56, height: 56)
-        .overlay(Circle().stroke(tint(s), lineWidth: 4))
+        .overlay(Circle().stroke(stateColor(s), lineWidth: 4))
     }
 }
 
