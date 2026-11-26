@@ -345,7 +345,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         if loc.course >= 0, let kk = k, kk > 8 { heading = loc.course }
         if let kk = k { kmh = kmh * 0.3 + kk * 0.7 }
         if kmh < 1 { kmh = 0 }
-        if !armed && kmh >= (resumedInBackground ? Self.armKmhRelaunch : Self.armKmh) { armed = true }
+        if !armed && kmh >= armAt { armed = true; announceArmed() }
 
         if let z = zone {
             let step = Self.dist(z.last.0, z.last.1, lat, lon)
@@ -354,6 +354,20 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
             if z.dist > 8000 || ts.timeIntervalSince(z.t0) > 15 * 60 { zone = nil }
         }
         processCams(lat, lon, ts)
+    }
+
+    private var armAt: Double { resumedInBackground ? Self.armKmhRelaunch : Self.armKmh }
+
+    /// Alerts just switched on. On screen the page shows its own message; in the background
+    /// (app on the Home Screen or phone locked) say so with a quiet notification, so the
+    /// driver knows TCK is working even before the first camera.
+    private func announceArmed() {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let c = UNMutableNotificationContent()
+        c.title = "✅ TCK — ئاگادارکردنەوەی کامێرا چالاک بوو"
+        c.body = "خێرایی \(Int(kmh.rounded())) km/h. کە لە کامێرایەک نزیک بوویتەوە ئاگادارت دەکەمەوە."
+        if #available(iOS 15.0, *) { c.interruptionLevel = .passive }
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "kg.armed", content: c, trigger: nil))
     }
 
     private func markGroup(_ c: Cam, _ rec: Rec) {
@@ -416,7 +430,8 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
             let secs = Date().timeIntervalSince(z.t0)
             if secs > 10 && z.dist >= 100 { zAvg = Int((z.dist / secs * 3.6).rounded()) }
         }
-        KameraLive.update(dist: show?.d, limit: show?.c.speed, kmh: kmh, over: over, zoneAvg: zAvg, zoneLimit: zLim)
+        KameraLive.update(dist: show?.d, limit: show?.c.speed, kmh: kmh, over: over, zoneAvg: zAvg, zoneLimit: zLim,
+                          armAt: armed ? 0 : Int(armAt))
     }
 
     private func checkZone(_ ts: Date) {
