@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -25,6 +26,22 @@
 
         </activity>
 
+        <!-- the app's own location service: alerts keep running after the app is swiped away -->
+        <service
+            android:name=".KameraService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- after a restart or an update: one-tap notification to turn alerts back on -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -40,6 +57,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- not required: the app must also be offered on tablets and phones without these
+         (Play warned that the plugin's gps feature and portrait-only hid it from some devices) -->
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" tools:replace="android:required" />
+    <uses-feature android:name="android.hardware.location" android:required="false" />
+    <uses-feature android:name="android.hardware.screen.portrait" android:required="false" />
     <!-- location, foreground service and notification permissions come from the
          background-geolocation plugin's manifest (merged at build time) -->
 </manifest>
