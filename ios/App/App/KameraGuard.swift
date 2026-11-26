@@ -487,6 +487,10 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
     static let hookJS = """
     (function () {
       if (window.__kgInstalled) return; window.__kgInstalled = true;
+      // In the iPhone app the alert sounds are played natively (KameraGuard.playSound), so the
+      // page's "tap the screen to turn on sound" hint (Web Audio unlock) is not needed here.
+      try { var st = document.createElement('style'); st.textContent = '#tapSound{display:none!important}';
+            (document.head || document.documentElement).appendChild(st); } catch (e) {}
       function post(m) { try { window.webkit.messageHandlers.kameraGuard.postMessage(m); } catch (e) {} }
       function read(k, d) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } }
       function state(cmd) {
