@@ -51,6 +51,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
     static let shared = KameraGuard()
     private static let site = "https://camera.4chra.com"
     private static let armKmh = 40.0
+    private static let armKmhRelaunch = 25.0   // after a background relaunch the car is already moving
 
     struct Cam { let id: String; let lat: Double; let lon: Double; let speed: Int? }
     final class Rec { var stage = 0; var passed = false; var urgentSent = false }
@@ -115,6 +116,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         UserDefaults.standard.set(true, forKey: Self.kEnabled)
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         refreshCams()
+        beginBackgroundSession()
         startLocationIfAllowed()
         startSignificantChanges()
         KameraLive.start()   // lock screen + Dynamic Island (only possible while the app is on screen)
@@ -165,13 +167,55 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         refreshCams()
         startLocationIfAllowed()
         startSignificantChanges()
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "kg.lastRelaunch")
+        // TestFlight builds only: say when iOS really relaunched the app in the background
+        // (checked after a few seconds, because at launch the state can read "background" even
+        // when the person opened the app)
+        if Self.isTestFlight {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                guard let self, self.resumedInBackground, UIApplication.shared.applicationState == .background else { return }
+                Self.postNow(id: "kg.relaunch", title: "TCK (تاقیکردنەوە)",
+                             body: "ئایفۆن ئەپەکەی لە پشتەوە کردەوە — ئاگادارکردنەوەی کامێرا چالاکە.")
+            }
+        }
     }
 
     /// When the person opens the app after a background relaunch, the page takes over again
     /// (its auto-start sends "start"), so the page and the alerts never disagree.
+    /// Alerts stay "on" (kEnabled) until the person presses Stop in the page.
     @objc private func appDidBecomeActive() {
         guard resumedInBackground else { return }
-        stop()
+        running = false
+        resumedInBackground = false
+        sleeping = false
+        lm.stopUpdatingLocation()
+        resetDrive()
+    }
+
+    /// True while camera alerts are on (the person has not pressed Stop).
+    var isEnabled: Bool { UserDefaults.standard.bool(forKey: Self.kEnabled) }
+
+    /// The person swiped the app away: iOS may not relaunch it, so say clearly that alerts stopped.
+    func appWillTerminate() {
+        guard isEnabled else { return }
+        KameraLive.end()
+        Self.postNow(id: "kg.stopped", title: "TCK — ئاگادارکردنەوەی کامێرا ڕاوەستا",
+                     body: "ئەپەکەت داخست، بۆیە ئاگادارکردنەوە ڕاوەستا. دەست لێرە بدە بۆ دەستپێکردنەوە. جاری داهاتوو ئەپەکە دامەخە، تەنها بگەڕێوە بۆ Home Screen.")
+        Thread.sleep(forTimeInterval: 0.4)   // give the notification time to be handed to the system
+    }
+
+    private static var isTestFlight: Bool {
+        Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+
+    private static func postNow(id: String, title: String, body: String) {
+        let c = UNMutableNotificationContent()
+        c.title = title
+        c.body = body
+        c.sound = .default
+        let req = UNNotificationRequest(identifier: id, content: c,
+                                        trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false))
+        UNUserNotificationCenter.current().add(req)
     }
 
     private func startSignificantChanges() {
@@ -301,7 +345,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         if loc.course >= 0, let kk = k, kk > 8 { heading = loc.course }
         if let kk = k { kmh = kmh * 0.3 + kk * 0.7 }
         if kmh < 1 { kmh = 0 }
-        if !armed && kmh >= Self.armKmh { armed = true }
+        if !armed && kmh >= (resumedInBackground ? Self.armKmhRelaunch : Self.armKmh) { armed = true }
 
         if let z = zone {
             let step = Self.dist(z.last.0, z.last.1, lat, lon)
