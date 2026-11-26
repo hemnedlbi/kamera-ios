@@ -18,10 +18,10 @@ enum KameraLive {
         #endif
     }
 
-    static func update(dist: Double?, limit: Int?, kmh: Double, over: Bool, zoneAvg: Int, zoneLimit: Int) {
+    static func update(dist: Double?, limit: Int?, kmh: Double, over: Bool, zoneAvg: Int, zoneLimit: Int, armAt: Int = 0) {
         #if canImport(ActivityKit)
         if #available(iOS 16.2, *) {
-            Impl.update(dist: dist, limit: limit, kmh: kmh, over: over, zoneAvg: zoneAvg, zoneLimit: zoneLimit)
+            Impl.update(dist: dist, limit: limit, kmh: kmh, over: over, zoneAvg: zoneAvg, zoneLimit: zoneLimit, armAt: armAt)
         }
         #endif
     }
@@ -47,7 +47,7 @@ enum KameraLive {
                 Task { await a.end(nil, dismissalPolicy: .immediate) }
             }
             if activity != nil { return }
-            let s = State(dist: -1, limit: 0, kmh: 0, over: false, zoneAvg: 0, zoneLimit: 0)
+            let s = State(dist: -1, limit: 0, kmh: 0, over: false, zoneAvg: 0, zoneLimit: 0, armAt: 40)
             do {
                 activity = try Activity.request(attributes: KameraActivityAttributes(),
                                                 content: ActivityContent(state: s, staleDate: nil),
@@ -59,15 +59,15 @@ enum KameraLive {
             }
         }
 
-        static func update(dist: Double?, limit: Int?, kmh: Double, over: Bool, zoneAvg: Int, zoneLimit: Int) {
+        static func update(dist: Double?, limit: Int?, kmh: Double, over: Bool, zoneAvg: Int, zoneLimit: Int, armAt: Int) {
             guard let act = activity else { return }
             let d = dist.map { Int(($0 / 10).rounded()) * 10 } ?? -1
             let s = State(dist: d, limit: limit ?? 0, kmh: max(0, Int(kmh.rounded())), over: over,
-                          zoneAvg: zoneAvg, zoneLimit: zoneLimit)
+                          zoneAvg: zoneAvg, zoneLimit: zoneLimit, armAt: armAt)
             guard s != last else { return }
             // important changes at once; small ones (speed, a few metres) at most every 3 s
             let important = last == nil || (s.dist < 0) != (last!.dist < 0) || s.over != last!.over
-                || (s.zoneLimit > 0) != (last!.zoneLimit > 0)
+                || (s.zoneLimit > 0) != (last!.zoneLimit > 0) || s.armAt != last!.armAt
             guard important || Date().timeIntervalSince(lastAt) >= 3 else { return }
             last = s
             lastAt = Date()

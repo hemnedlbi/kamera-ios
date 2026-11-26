@@ -7,9 +7,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // iOS relaunched the app in the background for a location event (the app had been
-        // swiped away or the phone restarted): keep the camera alerts going.
-        if launchOptions?[.location] != nil { KameraGuard.shared.resumeIfEnabled() }
+        // If camera alerts were on, start the native engine at once: iOS may have relaunched the
+        // app in the background for a location event (after a restart, or after it was closed),
+        // and the .location launch option is not always present. On a normal launch the page
+        // takes over as soon as the app becomes active (KameraGuard.appDidBecomeActive).
+        KameraGuard.shared.resumeIfEnabled()
         return true
     }
 
@@ -32,7 +34,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+        // The person swiped the app away while alerts were on: tell them alerts stopped.
+        KameraGuard.shared.appWillTerminate()
     }
 
     func application(_ application: UIApplication,

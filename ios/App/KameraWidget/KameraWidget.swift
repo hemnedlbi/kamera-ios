@@ -32,6 +32,7 @@ private func distText(_ m: Int) -> String {
 private func headline(_ s: KameraActivityAttributes.ContentState) -> String {
     if s.dist >= 0 { return s.over ? "خێراییت کەم بکەرەوە!" : "کامێرا لە پێشەوەیە" }
     if s.zoneLimit > 0 { return "ناوچەی تێکڕای خێرایی" }
+    if s.armAt > 0 { return "TCK ئامادەیە" }
     return "ئاگاداری کامێرا چالاکە"
 }
 
@@ -40,6 +41,7 @@ private func detail(_ s: KameraActivityAttributes.ContentState) -> String {
         return s.limit > 0 ? "\(distText(s.dist)) — سنوور \(s.limit) km/h" : distText(s.dist)
     }
     if s.zoneLimit > 0 { return "تێکڕا \(s.zoneAvg) — سنوور \(s.zoneLimit) km/h" }
+    if s.armAt > 0 { return "لە \(s.armAt) km/h ئاگادارکردنەوە دەست پێدەکات" }
     return "TCK – Traffic Camera Kurdistan"
 }
 
