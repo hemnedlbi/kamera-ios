@@ -117,6 +117,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         refreshCams()
         startLocationIfAllowed()
         startSignificantChanges()
+        KameraLive.start()   // lock screen + Dynamic Island (only possible while the app is on screen)
     }
 
     func stop() {
@@ -127,6 +128,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         lm.stopUpdatingLocation()
         lm.stopMonitoringSignificantLocationChanges()
         endBackgroundSession()
+        KameraLive.end()
         resetDrive()
     }
 
@@ -334,6 +336,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
             if d <= alertDist && d < (best?.d ?? .infinity) { best = (c, d) }
         }
         checkZone(ts)
+        updateLive(best)
 
         guard let hit = best, kmh >= 10, armed else { return }
         let c = hit.c, d = hit.d
@@ -357,6 +360,19 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
                 lastUrgentSound = Date(); _ = playSound("urgent")   // keep reminding while still too fast
             }
         }
+    }
+
+    /// Lock screen / Dynamic Island: next camera ahead, its limit, speed, average-speed zone.
+    private func updateLive(_ best: (c: Cam, d: Double)?) {
+        let show = armed && kmh >= 10 ? best : nil
+        let over = show.flatMap { b in b.c.speed.map { kmh > Double($0) + margin } } ?? false
+        var zAvg = 0, zLim = 0
+        if let z = zone {
+            zLim = z.limit
+            let secs = Date().timeIntervalSince(z.t0)
+            if secs > 10 && z.dist >= 100 { zAvg = Int((z.dist / secs * 3.6).rounded()) }
+        }
+        KameraLive.update(dist: show?.d, limit: show?.c.speed, kmh: kmh, over: over, zoneAvg: zAvg, zoneLimit: zLim)
     }
 
     private func checkZone(_ ts: Date) {

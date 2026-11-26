@@ -1,0 +1,30 @@
+name: One-off - add Live Activity widget target
+
+# Runs once when the script changes on this branch, commits the edited Xcode project back.
+on:
+  push:
+    branches: [feat/ios-background-relaunch]
+    paths: ['.github/scripts/add_widget_target.rb']
+
+permissions:
+  contents: write
+
+jobs:
+  add:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: xcodeproj gem
+        run: gem install xcodeproj --no-document --user-install || sudo gem install xcodeproj --no-document
+      - name: Add the target
+        run: |
+          export PATH="$(ruby -e 'print Gem.user_dir')/bin:$PATH"
+          ruby -r rubygems -e 'Gem.paths' && ruby .github/scripts/add_widget_target.rb
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ios/App/App.xcodeproj/project.pbxproj
+          if git diff --cached --quiet; then echo "nothing to commit"; exit 0; fi
+          git commit -m "iOS: add KameraWidget (Live Activity) extension target"
+          git push
