@@ -33,6 +33,7 @@ jobs:
 
       - name: Build (unsigned — AltStore signs it with your Apple ID)
         run: |
+          set -o pipefail   # a failed build must fail the job, even with | tail
           xcodebuild -project ios/App/App.xcodeproj -scheme App \
             -configuration Release -sdk iphoneos \
             -destination 'generic/platform=iOS' \

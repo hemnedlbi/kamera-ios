@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		3F99703E27391FE4D981ADB4 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 229316497AB36F690FB634E6 /* WidgetKit.framework */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -15,12 +16,50 @@
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		7C19BB9049E351C658BE5DB1 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0B8AEB12188200F40D6E29F9 /* Foundation.framework */; };
+		8D8A5B84293B6453FF90562F /* KameraWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FBFD8B28F41A3F8464B45B /* KameraWidget.swift */; };
 		9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6822FE993A50072D4E8 /* SceneDelegate.swift */; };
 		9582B6912FE993B00072D4E8 /* KameraGuard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9582B6902FE993B00072D4E8 /* KameraGuard.swift */; };
+		B005234064F82770C0F04146 /* KameraWidget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 0E04496EFC018F3580FBE705 /* KameraWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		D2EB772148BD6A6AF3D91577 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4C093E25577151F1BDD9DA94 /* SwiftUI.framework */; };
+		E651A30DC95B7B4B9690FCB8 /* KameraActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398D4E552C73F2C7DDB8CD99 /* KameraActivityAttributes.swift */; };
+		FA65DCCD15121323C7BF3DBA /* KameraLive.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7988D5740EE2005CF267CE3D /* KameraLive.swift */; };
+		FBC36D6BD6C4FF825DB4DF1D /* KameraActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 398D4E552C73F2C7DDB8CD99 /* KameraActivityAttributes.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		6BD4FFA12D9A26BB55AD7D5E /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EDE6ED7E0EB2CCED6E9CCDE9;
+			remoteInfo = KameraWidget;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5E853199A770691A93C5CAD7 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				B005234064F82770C0F04146 /* KameraWidget.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		0B8AEB12188200F40D6E29F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		0E04496EFC018F3580FBE705 /* KameraWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = KameraWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		148A5871854E0A3F70A8319C /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		229316497AB36F690FB634E6 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/WidgetKit.framework; sourceTree = DEVELOPER_DIR; };
+		26FBFD8B28F41A3F8464B45B /* KameraWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KameraWidget.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		398D4E552C73F2C7DDB8CD99 /* KameraActivityAttributes.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KameraActivityAttributes.swift; sourceTree = "<group>"; };
+		4C093E25577151F1BDD9DA94 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/SwiftUI.framework; sourceTree = DEVELOPER_DIR; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -29,9 +68,10 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		7988D5740EE2005CF267CE3D /* KameraLive.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KameraLive.swift; sourceTree = "<group>"; };
 		9582B6822FE993A50072D4E8 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		9582B6902FE993B00072D4E8 /* KameraGuard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KameraGuard.swift; sourceTree = "<group>"; };
+		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +80,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		95651F6BB6097D0D239D4791 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C19BB9049E351C658BE5DB1 /* Foundation.framework in Frameworks */,
+				3F99703E27391FE4D981ADB4 /* WidgetKit.framework in Frameworks */,
+				D2EB772148BD6A6AF3D91577 /* SwiftUI.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,6 +102,9 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+				EC58E5BD16F2E8C7AE1998E0 /* Shared */,
+				FAF6A894EBEC90068AF5BCC6 /* KameraWidget */,
+				7DC21959593F341BA79B3807 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -59,6 +112,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				0E04496EFC018F3580FBE705 /* KameraWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -76,8 +130,46 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				7988D5740EE2005CF267CE3D /* KameraLive.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		7210B92E31CF66366D0876DB /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				0B8AEB12188200F40D6E29F9 /* Foundation.framework */,
+				229316497AB36F690FB634E6 /* WidgetKit.framework */,
+				4C093E25577151F1BDD9DA94 /* SwiftUI.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		7DC21959593F341BA79B3807 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7210B92E31CF66366D0876DB /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		EC58E5BD16F2E8C7AE1998E0 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				398D4E552C73F2C7DDB8CD99 /* KameraActivityAttributes.swift */,
+			);
+			name = Shared;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		FAF6A894EBEC90068AF5BCC6 /* KameraWidget */ = {
+			isa = PBXGroup;
+			children = (
+				26FBFD8B28F41A3F8464B45B /* KameraWidget.swift */,
+				148A5871854E0A3F70A8319C /* Info.plist */,
+			);
+			name = KameraWidget;
+			path = KameraWidget;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -90,10 +182,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				5E853199A770691A93C5CAD7 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				DC5F1A817481F83AD1C3EDD1 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -102,6 +196,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		EDE6ED7E0EB2CCED6E9CCDE9 /* KameraWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 65EB811A47A6CFC3FDC85819 /* Build configuration list for PBXNativeTarget "KameraWidget" */;
+			buildPhases = (
+				480B84B6B5115F9E89F8C5E1 /* Sources */,
+				95651F6BB6097D0D239D4791 /* Frameworks */,
+				287F48FD8F7AD1C63F4CFAE6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KameraWidget;
+			productName = KameraWidget;
+			productReference = 0E04496EFC018F3580FBE705 /* KameraWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -136,11 +247,19 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				EDE6ED7E0EB2CCED6E9CCDE9 /* KameraWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		287F48FD8F7AD1C63F4CFAE6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3021FED79650016851F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -157,6 +276,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		480B84B6B5115F9E89F8C5E1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8D8A5B84293B6453FF90562F /* KameraWidget.swift in Sources */,
+				E651A30DC95B7B4B9690FCB8 /* KameraActivityAttributes.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -164,10 +292,21 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
 				9582B6912FE993B00072D4E8 /* KameraGuard.swift in Sources */,
+				FA65DCCD15121323C7BF3DBA /* KameraLive.swift in Sources */,
+				FBC36D6BD6C4FF825DB4DF1D /* KameraActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		DC5F1A817481F83AD1C3EDD1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = KameraWidget;
+			target = EDE6ED7E0EB2CCED6E9CCDE9 /* KameraWidget */;
+			targetProxy = 6BD4FFA12D9A26BB55AD7D5E /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -189,6 +328,35 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		0C58BC7D21A8E1A99D213396 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GG84JU45K5;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KameraWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chra4.camera.KameraWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -342,6 +510,34 @@
 			};
 			name = Release;
 		};
+		83EA30B7C593D9B952F43AF1 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = GG84JU45K5;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KameraWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.chra4.camera.KameraWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -359,6 +555,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		65EB811A47A6CFC3FDC85819 /* Build configuration list for PBXNativeTarget "KameraWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0C58BC7D21A8E1A99D213396 /* Release */,
+				83EA30B7C593D9B952F43AF1 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
