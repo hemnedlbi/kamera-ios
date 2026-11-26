@@ -9,4 +9,10 @@
     <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_kamera</string>
     <string name="capacitor_background_geolocation_notification_color">#16A34A</string>
     <string name="kamera_channel_alerts">ئاگادارکردنەوەی کامێرا</string>
+    <string name="kamera_channel_service">ئاگاداری کامێرا لە پشتەوە</string>
+    <string name="kamera_channel_resume">دەستپێکردنەوە دوای کوژانەوە</string>
+    <string name="kamera_service_title">TCK — ئاگاداری کامێرا چالاکە</string>
+    <string name="kamera_service_text">پێش گەیشتن بە کامێرا ئاگادارت دەکاتەوە، تەنانەت ئەگەر ئەپەکە داخرابێت.</string>
+    <string name="kamera_resume_title">TCK — ئاگادارکردنەوەی کامێرا ڕاوەستاوە</string>
+    <string name="kamera_resume_text">مۆبایلەکە کوژایەوە. دەست لێرە بدە بۆ ئەوەی ئاگادارکردنەوەی کامێراکان دەست پێ بکەنەوە.</string>
 </resources>

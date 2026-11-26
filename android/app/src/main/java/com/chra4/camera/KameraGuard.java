@@ -7,6 +7,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationListener;
@@ -50,8 +51,9 @@ import java.util.Map;
  Same logic and wording as ios/App/App/KameraGuard.swift. While the app is on screen the
  web page shows and sounds the alerts; when the app is in the background or the screen is
  off, this class reads GPS, checks the distance to each camera, posts the notification and
- plays the alert sound. Background location keeps working because the background-geolocation
- plugin runs a foreground service of type "location" while alerts are on.
+ plays the alert sound. Background location keeps working because KameraService (the app's own
+ foreground service of type "location") runs while alerts are on, also after the app is swiped
+ away. After a restart, BootReceiver offers a one-tap notification that turns the alerts back on.
 */
 public final class KameraGuard implements LocationListener {
 
@@ -113,7 +115,42 @@ public final class KameraGuard implements LocationListener {
 
     public boolean isVisible() { return visible; }
 
-    public void setVisible(boolean v) { visible = v; }
+    public void setVisible(boolean v) {
+        visible = v;
+        // if the service could not start earlier (app was in the background), start it now
+        if (v && running && listening) KameraService.start(ctx);
+    }
+
+    // ---------------------------------------------------------------- remembered state (for restarts)
+
+    private static final String PREFS = "kamera_guard", K_ON = "enabled", K_SETTINGS = "settings", K_USER = "userCams";
+
+    private static SharedPreferences prefs(Context c) { return c.getApplicationContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
+
+    /** True when the person turned camera alerts on and has not pressed Stop. */
+    public static boolean isEnabled(Context c) { return prefs(c).getBoolean(K_ON, false); }
+
+    /** Started by KameraService after a restart (the person tapped the notification): alerts run without the page. */
+    public void resumeFromPrefs() {
+        main.post(() -> {
+            if (running) return;
+            SharedPreferences p = prefs(ctx);
+            if (!p.getBoolean(K_ON, false)) { KameraService.stop(ctx); return; }
+            try {
+                JSONObject msg = new JSONObject();
+                String st = p.getString(K_SETTINGS, null), uc = p.getString(K_USER, null);
+                if (st != null) msg.put("settings", new JSONObject(st));
+                if (uc != null) msg.put("userCams", new JSONArray(uc));
+                apply(msg);
+            } catch (Exception ignored) { }
+            visible = false;      // the app is not on screen: the native side sounds the alerts
+            resetDrive();
+            armed = false;        // alerts arm at 40 km/h, like auto-start in the page
+            running = true;
+            refreshCams();
+            startLocationIfAllowed();
+        });
+    }
 
     // ---------------------------------------------------------------- commands from the page
 
@@ -134,14 +171,17 @@ public final class KameraGuard implements LocationListener {
         resetDrive();
         armed = msg.optBoolean("armed", false);
         running = true;
+        prefs(ctx).edit().putBoolean(K_ON, true).apply();
         refreshCams();
         startLocationIfAllowed();
     }
 
     private void stop() {
         running = false;
+        prefs(ctx).edit().putBoolean(K_ON, false).apply();
         main.removeCallbacks(permissionRetry);
         if (listening) { try { lm.removeUpdates(this); } catch (Exception ignored) { } listening = false; }
+        KameraService.stop(ctx);
         resetDrive();
     }
 
@@ -152,9 +192,13 @@ public final class KameraGuard implements LocationListener {
             v = s.optDouble("margin", Double.NaN); if (!Double.isNaN(v) && v >= 0) margin = v;
             if (s.has("sound")) soundOn = s.optBoolean("sound", true);
             if (s.has("vibrate")) vibrateOn = s.optBoolean("vibrate", true);
+            prefs(ctx).edit().putString(K_SETTINGS, s.toString()).apply();
         }
         JSONArray u = msg.optJSONArray("userCams");
-        if (u != null) userCams = parseCamList(u);
+        if (u != null) {
+            userCams = parseCamList(u);
+            prefs(ctx).edit().putString(K_USER, u.toString()).apply();
+        }
     }
 
     private void resetDrive() {
@@ -174,6 +218,8 @@ public final class KameraGuard implements LocationListener {
         try {
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 5f, this, Looper.getMainLooper());
             listening = true;
+            // our own foreground service keeps alerts alive in the background and after a swipe-away
+            KameraService.start(ctx);
         } catch (Exception e) {
             main.postDelayed(permissionRetry, 5000);
         }
@@ -502,8 +548,12 @@ public final class KameraGuard implements LocationListener {
             + "      if (p === 'BackgroundGeolocation' && m === 'removeWatcher') post({ cmd: 'stop' });\n"
             + "      return np.apply(C, arguments);\n"
             + "    };\n"
-            + "    C.nativeCallback = function (p, m) {\n"
-            + "      if (p === 'BackgroundGeolocation' && m === 'addWatcher') post(state('start'));\n"
+            + "    C.nativeCallback = function (p, m, o) {\n"
+            + "      if (p === 'BackgroundGeolocation' && m === 'addWatcher') {\n"
+            + "        post(state('start'));\n"
+            // KameraService shows the one background notification; the plugin's own would be a second one
+            + "        if (o && o.backgroundMessage) { var a = Array.prototype.slice.call(arguments); a[2] = Object.assign({}, o); delete a[2].backgroundMessage; delete a[2].backgroundTitle; return nc.apply(C, a); }\n"
+            + "      }\n"
             + "      return nc.apply(C, arguments);\n"
             + "    };\n"
             // alerts may already be on if the page started before this script arrived
