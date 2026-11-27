@@ -86,6 +86,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
     private var sleeping = false              // GPS paused while parked; wakes on the next significant change
     private var lastMoving = Date()
     private var bgSession: AnyObject?         // CLBackgroundActivitySession on iOS 17+
+    private var startedFromCar = false        // switched on from the CarPlay screen, not the page
 
     private override init() {
         super.init()
@@ -111,15 +112,18 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         armed = (msg["armed"] as? Bool) ?? false
         running = true
         resumedInBackground = false
+        startedFromCar = false
         sleeping = false
         lastMoving = Date()
         UserDefaults.standard.set(true, forKey: Self.kEnabled)
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        // .carPlay: the alert banners also show on the car screen
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .carPlay]) { _, _ in }
         refreshCams()
         beginBackgroundSession()
         startLocationIfAllowed()
         startSignificantChanges()
         KameraLive.start()   // lock screen + Dynamic Island (only possible while the app is on screen)
+        KameraCar.refreshEnabled()
     }
 
     func stop() {
@@ -132,6 +136,8 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         endBackgroundSession()
         KameraLive.end()
         resetDrive()
+        startedFromCar = false
+        KameraCar.refreshEnabled()
     }
 
     func apply(_ msg: [String: Any]) {
@@ -168,6 +174,7 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         startLocationIfAllowed()
         startSignificantChanges()
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "kg.lastRelaunch")
+        KameraCar.refreshEnabled()
         // TestFlight builds only: say when iOS really relaunched the app in the background
         // (checked after a few seconds, because at launch the state can read "background" even
         // when the person opened the app)
@@ -180,11 +187,21 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         }
     }
 
+    /// The driver pressed Start on the CarPlay screen: run the native engine with the last saved
+    /// settings, exactly as after a background relaunch. Stop on the car screen switches it off again.
+    func startFromCar() {
+        UserDefaults.standard.set(true, forKey: Self.kEnabled)
+        resumeIfEnabled()
+        startedFromCar = running
+        KameraCar.refreshEnabled()
+    }
+
     /// When the person opens the app after a background relaunch, the page takes over again
     /// (its auto-start sends "start"), so the page and the alerts never disagree.
     /// Alerts stay "on" (kEnabled) until the person presses Stop in the page.
     @objc private func appDidBecomeActive() {
-        guard resumedInBackground else { return }
+        // started from the car: keep alerts running when the phone app is opened
+        guard resumedInBackground, !startedFromCar else { return }
         running = false
         resumedInBackground = false
         sleeping = false
@@ -432,6 +449,8 @@ final class KameraGuard: NSObject, CLLocationManagerDelegate, AVAudioPlayerDeleg
         }
         KameraLive.update(dist: show?.d, limit: show?.c.speed, kmh: kmh, over: over, zoneAvg: zAvg, zoneLimit: zLim,
                           armAt: armed ? 0 : Int(armAt))
+        KameraCar.update(dist: show?.d, limit: show?.c.speed, kmh: kmh, over: over, zoneAvg: zAvg, zoneLimit: zLim,
+                         armAt: armed ? 0 : Int(armAt))
     }
 
     private func checkZone(_ ts: Date) {
