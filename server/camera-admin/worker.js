@@ -7,6 +7,9 @@
    GET  /admin/cameras          map editor: move (drag), delete / restore, speed, add, mark checked
    GET  /api/admin/cameras      all cameras for the editor (admin only)
    POST /api/admin/cameras      { action, id, ... } changes (admin only)
+   *    /api/admin/reports*     passed to the Pages site, but a copy of every report it
+                                deletes is kept first (table "deleted_reports"), so a
+                                deleted camera can be brought back in the editor
 
  The admin password is the same one as /admin: it is checked by asking the Pages site
  (camera-4chra.pages.dev/api/admin/reports) with the same x-admin-pin header, so no
@@ -30,6 +33,9 @@ export default {
         if (req.method === 'GET') return json(await listAll(env));
         if (req.method === 'POST') return json(await change(env, await req.json()));
       }
+      // the /admin page deletes reports for good: keep a copy of each one first
+      if (url.pathname.startsWith('/api/admin/reports') && req.method !== 'GET' && req.method !== 'HEAD')
+        return keepDeletedReports(req, env, url);
       // anything else (style.css, icons, the rest of the site): the Pages site as before
       return fetch(new Request(PAGES + url.pathname + url.search, req));
     } catch (e) {
@@ -71,6 +77,8 @@ async function ensureTable(env) {
     env.DB.prepare(`CREATE TABLE IF NOT EXISTS camera_log(
       id INTEGER PRIMARY KEY AUTOINCREMENT, cam_id TEXT NOT NULL, action TEXT NOT NULL,
       before TEXT, after TEXT, at TEXT NOT NULL DEFAULT (datetime('now')))`),
+    env.DB.prepare(`CREATE TABLE IF NOT EXISTS deleted_reports(
+      id INTEGER PRIMARY KEY, row TEXT NOT NULL, deleted_at TEXT NOT NULL DEFAULT (datetime('now')))`),
   ]);
   const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM cameras').first('n');
   if (!n) {
@@ -102,15 +110,40 @@ async function camerasJson(env) {
   }
 }
 
+/// Forward a change from the /admin page to the Pages site, and save every report row
+/// that disappears because of it, so it can be restored later.
+async function keepDeletedReports(req, env, url) {
+  await ensureTable(env);
+  const { results: before } = await env.DB.prepare('SELECT * FROM reports').all();
+  const res = await fetch(new Request(PAGES + url.pathname + url.search, req));
+  if (res.ok) {
+    try {
+      const { results: after } = await env.DB.prepare('SELECT id FROM reports').all();
+      const still = new Set(after.map(r => r.id));
+      const gone = before.filter(r => !still.has(r.id));
+      for (const r of gone) {
+        await env.DB.prepare('INSERT OR REPLACE INTO deleted_reports(id, row) VALUES (?, ?)').bind(r.id, JSON.stringify(r)).run();
+        await log(env, 'c' + r.id, 'delete', r, null);
+      }
+    } catch (e) { /* never block the admin page */ }
+  }
+  return res;
+}
+
 async function listAll(env) {
   const { results: cams } = await env.DB.prepare(
     'SELECT id, lat, lon, speed, area, source, active, updated_at, checked_at FROM cameras').all();
+  // approved = on the map; rejected (removed in this editor) and deleted (removed on /admin) = can be restored
   const { results: reps } = await env.DB.prepare(
-    "SELECT id, lat, lon, speed, note, status, created_at, reviewed_at FROM reports WHERE status = 'approved'").all();
+    "SELECT id, lat, lon, speed, note, status, created_at, reviewed_at FROM reports WHERE status IN ('approved', 'rejected')").all();
+  const { results: gone } = await env.DB.prepare('SELECT row FROM deleted_reports').all();
+  const seen = new Set(reps.map(r => r.id));
+  const del = gone.map(g => JSON.parse(g.row)).filter(r => !seen.has(r.id));
   return {
     cameras: cams,
-    community: reps.map(r => ({ id: 'c' + r.id, lat: r.lat, lon: r.lon, speed: r.speed, area: r.note || '',
-      source: 'community', active: 1, updated_at: r.reviewed_at || r.created_at, checked_at: null })),
+    community: reps.concat(del).map(r => ({ id: 'c' + r.id, lat: r.lat, lon: r.lon, speed: r.speed, area: r.note || '',
+      source: 'community', active: r.status === 'approved' && seen.has(r.id) ? 1 : 0,
+      updated_at: r.reviewed_at || r.created_at, checked_at: null })),
   };
 }
 
@@ -136,7 +169,19 @@ async function change(env, b) {
   // community cameras live in the "reports" table of the Pages site
   if (id.startsWith('c')) {
     const rid = +id.slice(1);
-    const row = await env.DB.prepare('SELECT * FROM reports WHERE id = ?').bind(rid).first();
+    let row = await env.DB.prepare('SELECT * FROM reports WHERE id = ?').bind(rid).first();
+    if (!row && action === 'restore') {
+      // deleted on /admin: put the saved copy back into the reports table
+      const g = await env.DB.prepare('SELECT row FROM deleted_reports WHERE id = ?').bind(rid).first('row');
+      if (!g) throw new Error('نەدۆزرایەوە');
+      const r = JSON.parse(g);
+      await env.DB.prepare(`INSERT INTO reports(id, lat, lon, speed, note, status, ip, created_at, reviewed_at)
+        VALUES (?, ?, ?, ?, ?, 'approved', ?, ?, datetime('now'))`)
+        .bind(r.id, r.lat, r.lon, r.speed ?? null, r.note ?? null, r.ip ?? null, r.created_at || null).run();
+      await env.DB.prepare('DELETE FROM deleted_reports WHERE id = ?').bind(rid).run();
+      await log(env, id, 'restore', null, r);
+      return { ok: true };
+    }
     if (!row) throw new Error('نەدۆزرایەوە');
     if (action === 'move') {
       const [lat, lon] = cleanLatLon(b.lat, b.lon);
@@ -149,6 +194,9 @@ async function change(env, b) {
     } else if (action === 'delete') {
       await env.DB.prepare("UPDATE reports SET status = 'rejected', reviewed_at = datetime('now') WHERE id = ?").bind(rid).run();
       await log(env, id, 'delete', row, null);
+    } else if (action === 'restore') {
+      await env.DB.prepare("UPDATE reports SET status = 'approved', reviewed_at = datetime('now') WHERE id = ?").bind(rid).run();
+      await log(env, id, 'restore', null, row);
     } else throw new Error('کارێکی نەناسراو');
     return { ok: true };
   }
@@ -340,7 +388,7 @@ function popup(c) {
     if (a === 'delete' && !b.dataset.sure) { b.dataset.sure = 1; b.textContent = 'دڵنیایت؟'; return; }
     try {
       await call('POST', { action: a, id: c.id });
-      if (a === 'delete') { if (c.source === 'community') data.community = data.community.filter(x => x !== c); else c.active = 0; }
+      if (a === 'delete') c.active = 0;
       if (a === 'restore') c.active = 1;
       if (a === 'checked') c.checked_at = new Date().toISOString();
       map.closePopup(); draw(); toast({ delete: 'سڕایەوە', restore: 'گەڕایەوە', checked: 'وەک ڕاست نیشان کرا ✓' }[a]);
