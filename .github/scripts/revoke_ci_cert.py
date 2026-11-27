@@ -8,7 +8,7 @@ may hold, and once the cap is reached every build fails with
 
 This script looks up the development certificates in the runner's keychain
 (their private keys vanish with the runner anyway) and revokes the matching
-"Created via API" certificates through the App Store Connect API.
+certificates with the same serial number through the App Store Connect API.
 Only certificates whose serial number is in this runner's keychain are touched,
 so the Distribution certificate and certificates made by hand stay untouched.
 
@@ -65,13 +65,18 @@ def main():
     if not serials:
         print("No Apple Development certificate in this runner's keychain; nothing to revoke.")
         return
+    print(f"Keychain development certificate serials: {sorted(serials)}")
     tok = token()
     data = call("GET", f"{API}/certificates?limit=200", tok)
     revoked = 0
     for c in data.get("data", []):
         a = c["attributes"]
         serial = (a.get("serialNumber") or "").upper().lstrip("0")
-        if serial in serials and a.get("name") == "Created via API":
+        kind = a.get("certificateType") or ""
+        print(f"  account cert {c['id']}: type={kind} name={a.get('name')!r} serial={serial}")
+        # Match on serial only: it is unique, and only this runner holds the
+        # private key. Distribution certificates are never touched.
+        if serial in serials and "DISTRIBUTION" not in kind:
             call("DELETE", f"{API}/certificates/{c['id']}", tok)
             print(f"Revoked CI certificate {c['id']} ({a.get('certificateType')}).")
             revoked += 1
