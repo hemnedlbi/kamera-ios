@@ -64,6 +64,12 @@ jobs:
           mkdir -p "$RUNNER_TEMP/keys"
           printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
 
+      - name: Remove old CI development certificates
+        # each run makes a new one on a fresh Mac; Apple's limit stops the archive otherwise
+        run: |
+          python3 -m pip install --quiet --break-system-packages "pyjwt[crypto]" || python3 -m pip install --quiet "pyjwt[crypto]"
+          python3 appstore/revoke_ci_dev_certs.py "$RUNNER_TEMP/keys/AuthKey_$ASC_KEY_ID.p8"
+
       - name: Archive (signed automatically by Apple)
         run: |
           xcodebuild -project ios/App/App.xcodeproj -scheme App \
